@@ -1,0 +1,54 @@
+name: aplikasi_perpustakaan
+description: Aplikasi Perpustakaan Kejaksaan Negeri
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  http: ^1.2.0
+
+  # CAMERA & FACE
+  camera: ^0.11.0
+  google_mlkit_face_detection: ^0.7.0
+  image_picker: ^1.0.7
+
+  # QR / BARCODE
+  mobile_scanner: ^5.1.1
+
+  # STORAGE
+  shared_preferences: ^2.2.2
+
+  # PDF
+  flutter_pdfview: ^1.3.2
+  path_provider: ^2.1.2
+
+  # FORMAT TANGGAL
+  intl: ^0.18.1
+  webview_flutter: ^4.13.1
+
+  # LOCAL NOTIFICATION + SOUND
+  flutter_local_notifications: ^17.2.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/logo_kejaksaan.png
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo_kejaksaan.png"
