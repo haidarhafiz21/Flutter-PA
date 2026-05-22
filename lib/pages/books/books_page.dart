@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../config/api_config.dart';
 import '../../services/book_service.dart';
 import 'read_book_page.dart';
 
@@ -28,6 +29,8 @@ class _BooksPageState extends State<BooksPage> {
   }
 
   Widget bookCard(Map book) {
+    final coverUrl = ApiConfig.fileUrl(book['cover_buku']?.toString());
+
     return Card(
       margin: const EdgeInsets.all(12),
       elevation: 4,
@@ -42,7 +45,7 @@ class _BooksPageState extends State<BooksPage> {
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.network(
-                "http://192.168.1.2:3000/${book['cover_buku']}",
+                coverUrl,
                 width: 60,
                 height: 80,
                 fit: BoxFit.cover,

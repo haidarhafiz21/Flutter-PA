@@ -24,24 +24,36 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int currentIndex = 0;
+  late String fotoWajah;
 
-  late final List pages = [
-    HomePage(
-      userId: widget.userId,
-      role: widget.role,
-      nama: widget.nama,
-      fotoWajah: widget.fotoWajah,
-    ),
-    BorrowStatusPage(userId: widget.userId),
-    RiwayatPage(userId: widget.userId),
-    ProfilPage(
-      userId: widget.userId,
-      fotoWajah: widget.fotoWajah,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    fotoWajah = widget.fotoWajah;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final pages = [
+      HomePage(
+        userId: widget.userId,
+        role: widget.role,
+        nama: widget.nama,
+        fotoWajah: fotoWajah,
+      ),
+      BorrowStatusPage(userId: widget.userId),
+      RiwayatPage(userId: widget.userId),
+      ProfilPage(
+        userId: widget.userId,
+        fotoWajah: fotoWajah,
+        onFotoUpdated: (value) {
+          setState(() {
+            fotoWajah = value;
+          });
+        },
+      ),
+    ];
+
     return Scaffold(
       body: pages[currentIndex],
       bottomNavigationBar: BottomNavigationBar(

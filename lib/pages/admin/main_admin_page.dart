@@ -20,6 +20,13 @@ class MainAdminPage extends StatefulWidget {
 
 class _MainAdminPageState extends State<MainAdminPage> {
   int selectedIndex = 0;
+  late String fotoWajah;
+
+  @override
+  void initState() {
+    super.initState();
+    fotoWajah = widget.fotoWajah;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,11 +34,17 @@ class _MainAdminPageState extends State<MainAdminPage> {
       AdminDashboardPage(
         nama: widget.nama,
         userId: widget.userId,
-        fotoWajah: widget.fotoWajah,
+        fotoWajah: fotoWajah,
       ),
       AdminProfilePage(
         nama: widget.nama,
-        fotoWajah: widget.fotoWajah,
+        userId: widget.userId,
+        fotoWajah: fotoWajah,
+        onFotoUpdated: (value) {
+          setState(() {
+            fotoWajah = value;
+          });
+        },
       ),
     ];
 

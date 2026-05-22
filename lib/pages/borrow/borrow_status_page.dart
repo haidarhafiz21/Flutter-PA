@@ -192,9 +192,7 @@ class _BorrowStatusPageState extends State<BorrowStatusPage> {
         int.tryParse((item["total_denda"] ?? item["denda"] ?? 0).toString()) ??
             0;
 
-    final cover = (item["cover_buku"] ?? "").toString();
-    final imageUrl =
-        cover.isEmpty ? "" : "${ApiConfig.baseUrl.replaceAll('/api', '')}/$cover";
+    final imageUrl = ApiConfig.fileUrl(item["cover_buku"]?.toString());
 
     final paymentUrl = (item["payment_url"] ?? "").toString().trim();
     final canPayOnline =

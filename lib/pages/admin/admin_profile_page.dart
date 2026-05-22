@@ -3,16 +3,21 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/borrow_service.dart';
 import '../login_page.dart';
 
 class AdminProfilePage extends StatefulWidget {
   final String nama;
+  final int userId;
   final String fotoWajah;
+  final ValueChanged<String>? onFotoUpdated;
 
   const AdminProfilePage({
     super.key,
     required this.nama,
+    required this.userId,
     required this.fotoWajah,
+    this.onFotoUpdated,
   });
 
   @override
@@ -50,12 +55,35 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
     /// simpan pakai prefix biar konsisten dengan register
     final base64Image = "data:image/jpeg;base64,${base64Encode(bytes)}";
 
+    final result = await BorrowService.updateFace(
+      userId: widget.userId,
+      fotoWajah: base64Image,
+    );
+
+    if (!mounted) return;
+
+    if (result["success"] == false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result["message"]?.toString() ?? "Gagal update foto"),
+        ),
+      );
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('foto_wajah', base64Image);
 
     setState(() {
       foto = base64Image;
     });
+    widget.onFotoUpdated?.call(base64Image);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result["message"]?.toString() ?? "Foto wajah diperbarui"),
+      ),
+    );
   }
 
   Future<void> logout() async {

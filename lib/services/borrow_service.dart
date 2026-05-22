@@ -55,6 +55,29 @@ class BorrowService {
     }
   }
 
+  /// ================= UPDATE FOTO WAJAH =================
+  static Future<Map<String, dynamic>> updateFace({
+    required int userId,
+    required String fotoWajah,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse(ApiConfig.updateFace),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          "user_id": userId,
+          "foto_wajah": fotoWajah,
+        }),
+      );
+
+      return res.body.isNotEmpty
+          ? jsonDecode(res.body)
+          : {"success": false, "message": "Response kosong"};
+    } catch (e) {
+      return {"success": false, "message": "Gagal update foto wajah"};
+    }
+  }
+
   /// ================= BOOKING =================
   static Future<Map<String, dynamic>> booking({
     required int userId,

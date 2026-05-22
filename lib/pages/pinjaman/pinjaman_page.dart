@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../config/api_config.dart';
 import '../../services/borrow_service.dart';
 
 class PinjamanPage extends StatefulWidget {
@@ -125,10 +126,40 @@ class _PinjamanPageState extends State<PinjamanPage> {
                       final status = (item['status'] ?? '-').toString();
                       final terlambatHari = hitungTerlambatHari(item);
                       final denda = totalDenda(item);
+                      final coverUrl =
+                          ApiConfig.fileUrl(item['cover_buku']?.toString());
 
                       return Card(
                         margin: const EdgeInsets.all(10),
                         child: ListTile(
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: coverUrl.isNotEmpty
+                                ? Image.network(
+                                    coverUrl,
+                                    width: 52,
+                                    height: 72,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      width: 52,
+                                      height: 72,
+                                      color: Colors.orange,
+                                      child: const Icon(
+                                        Icons.book,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    width: 52,
+                                    height: 72,
+                                    color: Colors.orange,
+                                    child: const Icon(
+                                      Icons.book,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                          ),
                           title: Text(item['judul'] ?? "-"),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
