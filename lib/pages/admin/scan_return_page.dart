@@ -1,10 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:http/http.dart' as http;
 
 import '../../config/api_config.dart';
-import 'verifikasi_pembayaran_page.dart';
+import '../../widgets/kejaksaan_ui.dart';
 
 class ScanReturnPage extends StatefulWidget {
   final int peminjamanId;
@@ -26,40 +28,35 @@ class ScanReturnPage extends StatefulWidget {
   State<ScanReturnPage> createState() => _ScanReturnPageState();
 }
 
-class _ScanReturnPageState extends State<ScanReturnPage> {
+class _ScanReturnPageState extends State<ScanReturnPage>
+    with SingleTickerProviderStateMixin {
   bool processing = false;
+
+  late AnimationController lineController;
 
   final MobileScannerController controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
 
-  String normalizeCode(String value) {
-    return value.trim();
-  }
+  @override
+  void initState() {
+    super.initState();
 
-  void showMsg(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
-    );
+    lineController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
   }
 
   Future<void> _onDetect(BarcodeCapture capture) async {
     if (processing) return;
 
-    final rawValue = capture.barcodes.first.rawValue;
-    if (rawValue == null || rawValue.isEmpty) return;
+    final barcode = capture.barcodes.first.rawValue;
 
-    final scannedCode = normalizeCode(rawValue);
-    final expectedCode = normalizeCode(widget.barcode);
+    if (barcode == null || barcode.isEmpty) return;
 
-    if (scannedCode.isEmpty) {
-      showMsg("Barcode tidak valid");
-      return;
-    }
-
-    if (expectedCode.isNotEmpty && scannedCode != expectedCode) {
-      showMsg("Barcode buku tidak sesuai dengan data peminjam");
+    if (barcode != widget.barcode && barcode != widget.peminjamanId.toString()) {
+      _error("Barcode tidak sesuai dengan data peminjaman");
       return;
     }
 
@@ -71,10 +68,9 @@ class _ScanReturnPageState extends State<ScanReturnPage> {
         Uri.parse(ApiConfig.returnBook),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
-          "book_id": scannedCode,
           "peminjaman_id": widget.peminjamanId,
-          "denda_kerusakan": 0,
-          "denda_kehilangan": 0,
+          "user_id": widget.userId,
+          "barcode": barcode,
         }),
       );
 
@@ -82,110 +78,227 @@ class _ScanReturnPageState extends State<ScanReturnPage> {
 
       if (!mounted) return;
 
-      if (data["butuh_pembayaran"] == true) {
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => VerifikasiPembayaranPage(
-              autoOpenPeminjamanId: data["peminjaman_id"],
-            ),
-          ),
-        );
-
-        if (!mounted) return;
-
-        if (result == true) {
-          showMsg("Pembayaran selesai. Data sudah masuk history.");
-          Navigator.pop(context, true);
-          return;
-        } else {
-          showMsg(
-            data["message"] ??
-                "Buku sudah diterima, menunggu pembayaran denda",
-          );
-        }
-      } else if (data["success"] == true) {
-        showMsg(data["message"] ?? "Buku berhasil dikembalikan");
-        Navigator.pop(context, true);
+      if (res.statusCode == 200 && data["success"] == true) {
+        showSuccess(data["message"] ?? "Pengembalian berhasil");
         return;
-      } else {
-        showMsg(data["message"] ?? "Pengembalian gagal");
       }
+
+      _error((data["message"] ?? "Gagal pengembalian").toString());
     } catch (e) {
-      if (!mounted) return;
-      showMsg("Gagal koneksi");
+      _error("Gagal terhubung ke server");
     }
 
+    await Future.delayed(const Duration(seconds: 2));
+
     if (!mounted) return;
+
     setState(() => processing = false);
     controller.start();
+  }
+
+  void _error(String msg) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
+  }
+
+  void showSuccess(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) {
+        return AlertDialog(
+          backgroundColor: KColors.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: KColors.gold),
+          ),
+          title: const Text(
+            "Pengembalian Berhasil",
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(
+              color: KColors.softText,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: KColors.gold,
+                foregroundColor: KColors.dark,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pop(context, true);
+              },
+              child: const Text("Selesai"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   void dispose() {
     controller.dispose();
+    lineController.dispose();
     super.dispose();
   }
 
-  Widget buildInfoCard() {
-    return Container(
-      margin: const EdgeInsets.all(14),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 8,
-            color: Colors.black12,
-            offset: Offset(0, 3),
-          )
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const CircleAvatar(
-                radius: 24,
-                child: Icon(Icons.person),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.nama,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text("Buku: ${widget.judul}"),
-                    Text("ID Peminjaman: ${widget.peminjamanId}"),
-                  ],
+  Widget buildScannerFrame() {
+    return Center(
+      child: SizedBox(
+        width: 270,
+        height: 270,
+        child: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: KColors.gold,
+                  width: 4,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: KColors.gold.withOpacity(0.4),
+                    blurRadius: 22,
+                  ),
+                ],
               ),
-            ],
+            ),
+            AnimatedBuilder(
+              animation: lineController,
+              builder: (_, __) {
+                return Positioned(
+                  top: 15 + (220 * lineController.value),
+                  left: 18,
+                  right: 18,
+                  child: Container(
+                    height: 4,
+                    decoration: BoxDecoration(
+                      gradient: KGradient.gold,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget buildTopInfo() {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 58, 20, 26),
+        decoration: const BoxDecoration(
+          gradient: KGradient.main,
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(36),
           ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.assignment_return_rounded,
+              color: KColors.gold,
+              size: 54,
             ),
-            child: Text(
-              "Barcode / ID Buku: ${widget.barcode}",
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
+            const SizedBox(height: 12),
+            const Text(
+              "Scan Pengembalian Buku",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 23,
               ),
             ),
-          )
-        ],
+            const SizedBox(height: 8),
+            Text(
+              widget.nama,
+              style: const TextStyle(
+                color: KColors.gold,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.judul,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: KColors.softText,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget buildBottomInfo() {
+    return Positioned(
+      bottom: 90,
+      left: 22,
+      right: 22,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.62),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: KColors.gold.withOpacity(0.35),
+          ),
+        ),
+        child: Column(
+          children: [
+            const Text(
+              "Barcode yang harus discan",
+              style: TextStyle(
+                color: KColors.gold,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.barcode,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              "Pastikan barcode sesuai dengan buku yang dikembalikan.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white70,
+                height: 1.4,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -193,39 +306,36 @@ class _ScanReturnPageState extends State<ScanReturnPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Scan Pengembalian"),
-      ),
-      body: Column(
+      backgroundColor: Colors.black,
+      body: Stack(
         children: [
-          buildInfoCard(),
-          Expanded(
-            child: Stack(
-              children: [
-                MobileScanner(
-                  controller: controller,
-                  onDetect: _onDetect,
-                ),
-                Center(
-                  child: Container(
-                    width: 250,
-                    height: 250,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.green, width: 3),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-                if (processing)
-                  Container(
-                    color: Colors.black54,
-                    child: const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
-                    ),
-                  ),
-              ],
+          MobileScanner(
+            controller: controller,
+            onDetect: _onDetect,
+          ),
+          buildTopInfo(),
+          buildScannerFrame(),
+          buildBottomInfo(),
+          Positioned(
+            top: 48,
+            left: 10,
+            child: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                color: Colors.white,
+              ),
             ),
           ),
+          if (processing)
+            Container(
+              color: Colors.black87,
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: KColors.gold,
+                ),
+              ),
+            ),
         ],
       ),
     );

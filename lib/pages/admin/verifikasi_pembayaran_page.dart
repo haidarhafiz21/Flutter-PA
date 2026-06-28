@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../config/api_config.dart';
 import '../../services/borrow_service.dart';
+import '../../widgets/kejaksaan_ui.dart';
 
 class VerifikasiPembayaranPage extends StatefulWidget {
   final int? autoOpenPeminjamanId;
@@ -21,6 +22,7 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
   List<dynamic> data = [];
   List<dynamic> filteredData = [];
   bool loading = true;
+  bool autoOpened = false;
 
   final TextEditingController searchController = TextEditingController();
 
@@ -41,17 +43,46 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
   Future<void> loadData() async {
     setState(() => loading = true);
 
-    final result = await BorrowService.getActiveList();
+    try {
+      final result = await BorrowService.getActiveList();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      data = result;
-      filteredData = result;
-      loading = false;
-    });
+      setState(() {
+        data = result;
+        filteredData = result;
+        loading = false;
+      });
 
-    applySearch();
+      applySearch();
+      autoOpenIfNeeded();
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        data = [];
+        filteredData = [];
+        loading = false;
+      });
+    }
+  }
+
+  void autoOpenIfNeeded() {
+    if (autoOpened || widget.autoOpenPeminjamanId == null) return;
+
+    final found = data.where((item) {
+      final d = Map<String, dynamic>.from(item);
+      final id = int.tryParse("${d['id']}") ?? 0;
+      return id == widget.autoOpenPeminjamanId;
+    }).toList();
+
+    if (found.isNotEmpty) {
+      autoOpened = true;
+      Future.delayed(const Duration(milliseconds: 350), () {
+        if (!mounted) return;
+        openDetail(Map<String, dynamic>.from(found.first));
+      });
+    }
   }
 
   void applySearch() {
@@ -119,27 +150,18 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
   Color getStatusColor(String status) {
     switch (status) {
       case 'dipinjam':
-        return Colors.green;
+        return KColors.gold;
       case 'terlambat':
-        return Colors.red;
+        return KColors.danger;
       case 'menunggu_pembayaran':
         return Colors.orange;
       default:
-        return Colors.grey;
+        return KColors.softText;
     }
   }
 
   Color getStatusBgColor(String status) {
-    switch (status) {
-      case 'dipinjam':
-        return Colors.green.withOpacity(0.12);
-      case 'terlambat':
-        return Colors.red.withOpacity(0.12);
-      case 'menunggu_pembayaran':
-        return Colors.orange.withOpacity(0.12);
-      default:
-        return Colors.grey.withOpacity(0.12);
-    }
+    return getStatusColor(status).withOpacity(0.16);
   }
 
   String getStatusText(String status) {
@@ -151,43 +173,49 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
       case 'menunggu_pembayaran':
         return "Menunggu Pembayaran";
       default:
-        return status;
+        return status.isEmpty ? "-" : status;
     }
+  }
+
+  String getCoverPath(Map<String, dynamic> d) {
+    return (d['cover_buku'] ??
+            d['cover'] ??
+            d['gambar'] ??
+            d['sampul'] ??
+            '')
+        .toString();
   }
 
   Widget buildCover(String? coverPath, Color color) {
     final imageUrl = ApiConfig.fileUrl(coverPath);
 
-    if (imageUrl.isEmpty) {
+    Widget fallback() {
       return Container(
-        width: 74,
-        height: 96,
+        width: 78,
+        height: 105,
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(14),
+          color: KColors.card2,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: KColors.gold.withOpacity(0.45)),
         ),
-        child: const Icon(Icons.book, color: Colors.white, size: 32),
+        child: const Icon(
+          Icons.menu_book_rounded,
+          color: KColors.gold,
+          size: 34,
+        ),
       );
     }
 
+    if (imageUrl.isEmpty) return fallback();
+
     return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: Image.network(
         imageUrl,
-        width: 74,
-        height: 96,
+        width: 78,
+        height: 105,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) {
-          return Container(
-            width: 74,
-            height: 96,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.book, color: Colors.white, size: 32),
-          );
-        },
+        errorBuilder: (_, __, ___) => fallback(),
       ),
     );
   }
@@ -207,7 +235,9 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(result["message"]?.toString() ?? "Denda berhasil disimpan"),
+        content: Text(
+          result["message"]?.toString() ?? "Denda berhasil disimpan",
+        ),
       ),
     );
 
@@ -227,7 +257,9 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(result["message"]?.toString() ?? "Pembayaran selesai"),
+        content: Text(
+          result["message"]?.toString() ?? "Pembayaran selesai",
+        ),
       ),
     );
 
@@ -296,9 +328,9 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
 
             return Container(
               decoration: const BoxDecoration(
-                color: Colors.white,
+                color: KColors.bg,
                 borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(28),
+                  top: Radius.circular(30),
                 ),
               ),
               child: SafeArea(
@@ -318,33 +350,30 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
                           width: 52,
                           height: 5,
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade400,
+                            color: KColors.gold,
                             borderRadius: BorderRadius.circular(20),
                           ),
                         ),
                       ),
                       const SizedBox(height: 18),
-
                       Text(
                         nama,
                         style: const TextStyle(
                           fontSize: 22,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
                         ),
                       ),
-
                       const SizedBox(height: 6),
-
                       Text(
                         "Buku: $judul",
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey.shade800,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: KColors.softText,
+                          height: 1.4,
                         ),
                       ),
-
-                      const SizedBox(height: 10),
-
+                      const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -353,33 +382,36 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
                         decoration: BoxDecoration(
                           color: getStatusBgColor(status),
                           borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: getStatusColor(status).withOpacity(0.35),
+                          ),
                         ),
                         child: Text(
                           getStatusText(status),
                           style: TextStyle(
                             color: getStatusColor(status),
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 18),
-
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.orange.shade100),
+                          gradient: KGradient.card,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: KColors.gold.withOpacity(0.35),
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               "Denda saat ini",
                               style: TextStyle(
-                                color: Colors.grey.shade700,
+                                color: KColors.softText,
                                 fontSize: 13,
                               ),
                             ),
@@ -387,68 +419,94 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
                             Text(
                               formatRupiah(totalTersimpan),
                               style: const TextStyle(
-                                color: Colors.deepOrange,
+                                color: KColors.danger,
                                 fontSize: 24,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
                             const SizedBox(height: 10),
                             Text(
                               "Preview total setelah input: ${formatRupiah(previewTotal)}",
-                              style: TextStyle(
-                                color: Colors.grey.shade800,
-                                fontWeight: FontWeight.w600,
+                              style: const TextStyle(
+                                color: KColors.gold,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 18),
-
                       TextField(
                         controller: kerusakanController,
                         keyboardType: TextInputType.number,
+                        style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           labelText: "Denda Kerusakan",
+                          labelStyle: const TextStyle(color: KColors.softText),
                           hintText: "Masukkan nominal kerusakan",
-                          prefixIcon: const Icon(Icons.build_outlined),
+                          hintStyle: const TextStyle(color: KColors.softText),
+                          prefixIcon: const Icon(
+                            Icons.build_outlined,
+                            color: KColors.gold,
+                          ),
                           filled: true,
-                          fillColor: Colors.grey.shade50,
+                          fillColor: KColors.card,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(
+                              color: KColors.gold.withOpacity(0.45),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(color: KColors.gold),
                           ),
                         ),
                         onChanged: (_) => setModalState(() {}),
                       ),
-
                       const SizedBox(height: 14),
-
                       TextField(
                         controller: kehilanganController,
                         keyboardType: TextInputType.number,
+                        style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           labelText: "Denda Kehilangan",
+                          labelStyle: const TextStyle(color: KColors.softText),
                           hintText: "Masukkan nominal kehilangan",
-                          prefixIcon: const Icon(Icons.warning_amber_rounded),
+                          hintStyle: const TextStyle(color: KColors.softText),
+                          prefixIcon: const Icon(
+                            Icons.warning_amber_rounded,
+                            color: KColors.gold,
+                          ),
                           filled: true,
-                          fillColor: Colors.grey.shade50,
+                          fillColor: KColors.card,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(
+                              color: KColors.gold.withOpacity(0.45),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(color: KColors.gold),
                           ),
                         ),
                         onChanged: (_) => setModalState(() {}),
                       ),
-
                       const SizedBox(height: 18),
-
                       SizedBox(
                         width: double.infinity,
                         height: 52,
-                        child: ElevatedButton(
+                        child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
+                            backgroundColor: KColors.gold,
+                            foregroundColor: KColors.dark,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
@@ -483,81 +541,109 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
 
                                   setModalState(() => saving = false);
                                 },
-                          child: saving
+                          icon: saving
                               ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
+                                  width: 18,
+                                  height: 18,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: Colors.white,
+                                    color: KColors.dark,
                                   ),
                                 )
-                              : const Text(
-                                  "Simpan Denda",
+                              : const Icon(Icons.save_rounded),
+                          label: const Text(
+                            "Simpan Denda",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      if (totalAktif <= 0)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: KColors.card,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: KColors.gold.withOpacity(0.35),
+                            ),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline_rounded,
+                                color: KColors.gold,
+                              ),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  "Isi nominal denda kerusakan atau kehilangan terlebih dahulu, lalu tekan Simpan Denda agar tombol pembayaran aktif.",
                                   style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                                    color: KColors.softText,
+                                    height: 1.4,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.green,
-                            side: const BorderSide(color: Colors.green),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
+                              ),
+                            ],
                           ),
-                          onPressed: totalAktif > 0
-                              ? () => bayarCash(
-                                    peminjamanId: peminjamanId,
-                                    jumlah: totalAktif,
-                                  )
-                              : null,
-                          child: const Text(
-                            "Bayar Cash",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                        )
+                      else ...[
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: KColors.gold,
+                              side: const BorderSide(color: KColors.gold),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
                             ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.deepOrange,
-                            side: const BorderSide(color: Colors.deepOrange),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                            onPressed: () => bayarCash(
+                              peminjamanId: peminjamanId,
+                              jumlah: totalAktif,
                             ),
-                          ),
-                          onPressed: totalAktif > 0
-                              ? () => buatTagihanOnline(
-                                    peminjamanId: peminjamanId,
-                                  )
-                              : null,
-                          child: const Text(
-                            "Buat Tagihan Online",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                            icon: const Icon(Icons.payments_rounded),
+                            label: const Text(
+                              "Bayar Cash",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.orange,
+                              side: const BorderSide(color: Colors.orange),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            onPressed: () => buatTagihanOnline(
+                              peminjamanId: peminjamanId,
+                            ),
+                            icon: const Icon(Icons.qr_code_rounded),
+                            label: const Text(
+                              "Buat Tagihan Online",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -573,25 +659,33 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
 
   Widget buildSearchBox() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
       child: TextField(
         controller: searchController,
+        style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
           hintText: "Cari nama / judul / barcode...",
-          prefixIcon: const Icon(Icons.search, size: 26),
+          hintStyle: const TextStyle(color: KColors.softText),
+          prefixIcon: const Icon(
+            Icons.search,
+            size: 26,
+            color: KColors.gold,
+          ),
           contentPadding: const EdgeInsets.symmetric(vertical: 18),
           filled: true,
-          fillColor: Colors.white,
+          fillColor: KColors.card,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(22),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(22),
-            borderSide: BorderSide(color: Colors.grey.shade400),
+            borderSide: BorderSide(
+              color: KColors.gold.withOpacity(0.45),
+            ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(22),
-            borderSide: const BorderSide(color: Colors.green),
+            borderSide: const BorderSide(color: KColors.gold),
           ),
         ),
       ),
@@ -605,112 +699,142 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
 
     return InkWell(
       onTap: () => openDetail(d),
-      borderRadius: BorderRadius.circular(22),
-      child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        elevation: 3,
-        shadowColor: Colors.black12,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(26),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: KGradient.card,
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: KColors.gold.withOpacity(0.45)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.22),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              buildCover(d['cover_buku']?.toString(), color),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      (d['nama_lengkap'] ?? "-").toString(),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            buildCover(getCoverPath(d), color),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    (d['nama_lengkap'] ?? "-").toString(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 17,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Buku: ${d['judul'] ?? "-"}",
-                      style: const TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Buku: ${d['judul'] ?? "-"}",
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: KColors.softText,
+                      fontSize: 14,
+                      height: 1.35,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Barcode: ${d['barcode'] ?? "-"}",
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    "Barcode: ${d['barcode'] ?? "-"}",
+                    style: const TextStyle(
+                      color: KColors.gold,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: getStatusBgColor(status),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: color.withOpacity(0.35)),
+                    ),
+                    child: Text(
+                      getStatusText(status),
                       style: TextStyle(
-                        color: Colors.grey.shade700,
+                        color: color,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: getStatusBgColor(status),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Pinjam: ${formatDate(d['tanggal_pinjam']?.toString())}",
+                    style: const TextStyle(
+                      color: KColors.softText,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                  Text(
+                    "Kembali: ${formatDate(d['tanggal_kembali']?.toString())}",
+                    style: const TextStyle(
+                      color: KColors.softText,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                  if (denda > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        getStatusText(status),
-                        style: TextStyle(
-                          color: color,
-                          fontWeight: FontWeight.bold,
+                        "Denda: ${formatRupiah(denda)}",
+                        style: const TextStyle(
+                          color: KColors.danger,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "Pinjam: ${formatDate(d['tanggal_pinjam']?.toString())}",
-                    ),
-                    Text(
-                      "Kembali: ${formatDate(d['tanggal_kembali']?.toString())}",
-                    ),
-                    if (denda > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(
-                          "Denda: ${formatRupiah(denda)}",
-                          style: const TextStyle(
-                            color: Colors.deepOrange,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+                ],
               ),
-              const Padding(
-                padding: EdgeInsets.only(top: 30),
-                child: Icon(Icons.chevron_right, size: 28),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: 35),
+              child: Icon(
+                Icons.chevron_right_rounded,
+                size: 30,
+                color: KColors.gold,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   Widget buildEmptyState() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 140),
+    return const Padding(
+      padding: EdgeInsets.only(top: 140),
       child: Column(
         children: [
           Icon(
             Icons.assignment_outlined,
             size: 70,
-            color: Colors.grey.shade400,
+            color: KColors.gold,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Text(
             "Tidak ada data",
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey.shade700,
-              fontWeight: FontWeight.w600,
+              color: KColors.softText,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -720,7 +844,9 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
 
   Widget buildBody() {
     if (loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: KColors.gold),
+      );
     }
 
     return RefreshIndicator(
@@ -745,20 +871,23 @@ class _VerifikasiPembayaranPageState extends State<VerifikasiPembayaranPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xfff7f7f9),
-      appBar: AppBar(
-        backgroundColor: const Color(0xfff7f7f9),
-        elevation: 0,
-        title: const Text(
-          "Verifikasi Pembayaran",
-          style: TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.w600,
+      backgroundColor: KColors.bg,
+      body: Column(
+        children: [
+          KHeader(
+            title: "Verifikasi Pembayaran",
+            subtitle: "Validasi denda, cash, dan tagihan online",
+            trailing: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                color: Colors.white,
+              ),
+            ),
           ),
-        ),
-        iconTheme: const IconThemeData(color: Colors.black87),
+          Expanded(child: buildBody()),
+        ],
       ),
-      body: buildBody(),
     );
   }
 }

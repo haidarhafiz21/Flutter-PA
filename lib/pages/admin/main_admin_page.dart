@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../widgets/kejaksaan_ui.dart';
+
 import 'admin_dashboard_page.dart';
 import 'admin_profile_page.dart';
 
@@ -49,25 +51,58 @@ class _MainAdminPageState extends State<MainAdminPage> {
     ];
 
     return Scaffold(
+      backgroundColor: KColors.bg,
       body: pages[selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: selectedIndex,
-        selectedItemColor: Colors.green,
-        onTap: (index) {
-          setState(() {
-            selectedIndex = index;
-          });
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "Beranda",
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: KColors.dark,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(28),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: "Profil",
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.18),
+              blurRadius: 18,
+              offset: const Offset(0, -6),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(28),
           ),
-        ],
+          child: BottomNavigationBar(
+            currentIndex: selectedIndex,
+            backgroundColor: KColors.dark,
+            type: BottomNavigationBarType.fixed,
+            elevation: 0,
+            selectedItemColor: KColors.gold,
+            unselectedItemColor: Colors.white54,
+            selectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 11,
+            ),
+            onTap: (index) {
+              setState(() {
+                selectedIndex = index;
+              });
+            },
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.dashboard_rounded),
+                label: "Beranda",
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_rounded),
+                label: "Profil",
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

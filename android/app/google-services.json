@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "322459206276",
+    "project_id": "perpustakaan-kejaksaan",
+    "storage_bucket": "perpustakaan-kejaksaan.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:322459206276:android:1c6992b9566df07382b8d1",
+        "android_client_info": {
+          "package_name": "com.example.aplikasi_perpustakaan"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAouGRr3ETqZt1fwAWQgns6o79FSoDHHGc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

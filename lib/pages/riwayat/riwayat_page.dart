@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../services/borrow_service.dart';
+
 import '../../config/api_config.dart';
+import '../../services/borrow_service.dart';
+import '../../widgets/kejaksaan_ui.dart';
 
 class RiwayatPage extends StatefulWidget {
   final int userId;
@@ -32,9 +34,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
 
       final filtered = result.where((e) {
         if (e is! Map) return false;
-
         final status = (e['status'] ?? '').toString().toLowerCase();
-
         return status == 'dikembalikan' || status == 'dibatalkan';
       }).toList();
 
@@ -55,17 +55,16 @@ class _RiwayatPageState extends State<RiwayatPage> {
   Color statusColor(String status) {
     switch (status.toLowerCase()) {
       case 'dikembalikan':
-        return Colors.blue;
+        return KColors.gold;
       case 'dibatalkan':
         return Colors.grey;
       default:
-        return Colors.black54;
+        return KColors.softText;
     }
   }
 
   String formatRupiah(dynamic value) {
     final int number = int.tryParse((value ?? 0).toString()) ?? 0;
-
     return "Rp ${number.toString().replaceAllMapped(
           RegExp(r'\B(?=(\d{3})+(?!\d))'),
           (match) => '.',
@@ -95,12 +94,8 @@ class _RiwayatPageState extends State<RiwayatPage> {
     final paymentTypeLower = paymentType.toLowerCase();
     final channelLower = channel.toLowerCase();
 
-    if (channel.isNotEmpty && channelLower != 'null') {
-      return channel;
-    }
-
+    if (channel.isNotEmpty && channelLower != 'null') return channel;
     if (metodeLower == 'cash') return 'Cash';
-
     if (paymentTypeLower == 'echannel') return 'Mandiri Bill';
     if (paymentTypeLower == 'qris') return 'QRIS';
     if (paymentTypeLower == 'bank_transfer') return 'Bank Transfer';
@@ -108,9 +103,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
     if (paymentTypeLower == 'gopay') return 'GoPay';
     if (paymentTypeLower == 'shopeepay') return 'ShopeePay';
     if (paymentTypeLower == 'cstore') return 'Convenience Store';
-
     if (metodeLower == 'online') return 'Online / Midtrans';
-
     if (metode.isNotEmpty && metodeLower != 'null') return metode;
 
     return '-';
@@ -119,53 +112,67 @@ class _RiwayatPageState extends State<RiwayatPage> {
   Widget buildCover(String? coverPath) {
     final imageUrl = ApiConfig.fileUrl(coverPath);
 
-    if (imageUrl.isEmpty) {
-      return Container(
-        width: 62,
-        height: 84,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade300,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.book, size: 28),
-      );
-    }
+    if (imageUrl.isEmpty) return coverPlaceholder();
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(18),
       child: Image.network(
         imageUrl,
-        width: 62,
-        height: 84,
+        width: 88,
+        height: 120,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) {
-          return Container(
-            width: 62,
-            height: 84,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.book, size: 28),
-          );
-        },
+        errorBuilder: (_, __, ___) => coverPlaceholder(),
       ),
     );
   }
 
-  Widget buildStatusBadge(String status) {
+  Widget coverPlaceholder() {
+    return Container(
+      width: 88,
+      height: 120,
+      decoration: BoxDecoration(
+        color: KColors.card2,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: KColors.gold.withOpacity(0.5)),
+      ),
+      child: const Icon(
+        Icons.menu_book_rounded,
+        color: KColors.gold,
+        size: 42,
+      ),
+    );
+  }
+
+  Widget statusBadge(String status) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: statusColor(status).withOpacity(0.12),
-        borderRadius: BorderRadius.circular(10),
+        color: statusColor(status).withOpacity(0.17),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: statusColor(status).withOpacity(0.35)),
       ),
       child: Text(
         status,
         style: TextStyle(
           color: statusColor(status),
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w900,
           fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget dendaText(String label, int value) {
+    if (value <= 0) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Text(
+        "$label: ${formatRupiah(value)}",
+        style: const TextStyle(
+          color: KColors.danger,
+          fontWeight: FontWeight.w800,
+          fontSize: 13,
         ),
       ),
     );
@@ -189,86 +196,119 @@ class _RiwayatPageState extends State<RiwayatPage> {
 
     final metodePembayaran = formatMetodePembayaran(item);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-            offset: Offset(0, 3),
+    return KCard(
+      margin: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      padding: const EdgeInsets.all(14),
+      radius: 26,
+      borderGold: true,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          buildCover(item['cover_buku']?.toString()),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item['judul'] ?? "-",
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                statusBadge(status),
+                const SizedBox(height: 10),
+                Text(
+                  "Pinjam: ${formatTanggal(item['tanggal_pinjam'])}",
+                  style: KText.body.copyWith(fontSize: 13),
+                ),
+                Text(
+                  status.toLowerCase() == 'dibatalkan'
+                      ? "Dibatalkan: ${formatTanggal(item['batas_ambil'])}"
+                      : "Dikembalikan: ${formatTanggal(tanggalKembaliTampil)}",
+                  style: KText.body.copyWith(fontSize: 13),
+                ),
+                if (totalDenda > 0) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: KColors.gold.withOpacity(0.13),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: KColors.gold.withOpacity(0.35)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.payments_rounded,
+                          color: KColors.gold,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "Metode Pembayaran: $metodePembayaran",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                dendaText("Denda Terlambat", dendaTerlambat),
+                dendaText("Denda Kerusakan", dendaKerusakan),
+                dendaText("Denda Kehilangan", dendaKehilangan),
+                if (totalDenda > 0) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    "Total Denda: ${formatRupiah(totalDenda)}",
+                    style: const TextStyle(
+                      color: KColors.danger,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget emptyState() {
+    return const Center(
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: EdgeInsets.all(34),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            buildCover(item['cover_buku']?.toString()),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item['judul'] ?? "-",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 17,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  buildStatusBadge(status),
-                  const SizedBox(height: 10),
-                  Text(
-                    "Pinjam: ${formatTanggal(item['tanggal_pinjam'])}",
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  Text(
-                    status.toLowerCase() == 'dibatalkan'
-                        ? "Dibatalkan: ${formatTanggal(item['batas_ambil'])}"
-                        : "Dikembalikan: ${formatTanggal(tanggalKembaliTampil)}",
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  if (totalDenda > 0) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      "Metode Pembayaran: $metodePembayaran",
-                      style: const TextStyle(
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                  if (dendaTerlambat > 0)
-                    Text(
-                      "Denda Terlambat: ${formatRupiah(dendaTerlambat)}",
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  if (dendaKerusakan > 0)
-                    Text(
-                      "Denda Kerusakan: ${formatRupiah(dendaKerusakan)}",
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  if (dendaKehilangan > 0)
-                    Text(
-                      "Denda Kehilangan: ${formatRupiah(dendaKehilangan)}",
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  if (totalDenda > 0)
-                    Text(
-                      "Total Denda: ${formatRupiah(totalDenda)}",
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                ],
+            Icon(Icons.history_rounded, color: KColors.gold, size: 88),
+            SizedBox(height: 16),
+            Text(
+              "Belum Ada Riwayat",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
               ),
+            ),
+            SizedBox(height: 6),
+            Text(
+              "Riwayat peminjaman akan muncul setelah buku dikembalikan atau dibatalkan.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: KColors.softText),
             ),
           ],
         ),
@@ -279,25 +319,32 @@ class _RiwayatPageState extends State<RiwayatPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xfff5f2f5),
-      appBar: AppBar(
-        title: const Text('Riwayat Peminjaman'),
-        centerTitle: true,
+      backgroundColor: KColors.bg,
+      body: Column(
+        children: [
+          const KHeader(
+            title: "Riwayat Peminjaman",
+            subtitle: "Catatan pengembalian dan pembayaran",
+          ),
+          Expanded(
+            child: loading
+                ? const Center(child: CircularProgressIndicator())
+                : data.isEmpty
+                    ? emptyState()
+                    : RefreshIndicator(
+                        onRefresh: loadData,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.only(top: 12, bottom: 24),
+                          itemCount: data.length,
+                          itemBuilder: (context, i) {
+                            final item = Map<String, dynamic>.from(data[i]);
+                            return buildItem(item);
+                          },
+                        ),
+                      ),
+          ),
+        ],
       ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : data.isEmpty
-              ? const Center(child: Text("Belum ada riwayat"))
-              : RefreshIndicator(
-                  onRefresh: loadData,
-                  child: ListView.builder(
-                    itemCount: data.length,
-                    itemBuilder: (context, i) {
-                      final item = Map<String, dynamic>.from(data[i]);
-                      return buildItem(item);
-                    },
-                  ),
-                ),
     );
   }
 }

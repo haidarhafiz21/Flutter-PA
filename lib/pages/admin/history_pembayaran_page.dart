@@ -1,8 +1,11 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+
 import '../../config/api_config.dart';
+import '../../widgets/kejaksaan_ui.dart';
 
 class HistoryPembayaranPage extends StatefulWidget {
   const HistoryPembayaranPage({super.key});
@@ -68,17 +71,23 @@ class _HistoryPembayaranPageState extends State<HistoryPembayaranPage> {
 
   String formatMetode(Map<String, dynamic> d) {
     final paymentType = (d["payment_type"] ?? "").toString().trim();
-    final channel = (d["payment_channel"] ?? d["channel"] ?? "").toString().trim();
-    final metode = (d["metode"] ?? "").toString().trim();
+    final channel =
+        (d["payment_channel"] ?? d["channel"] ?? "").toString().trim();
+    final metode = (d["metode"] ?? d["metode_pembayaran"] ?? "")
+        .toString()
+        .trim();
 
     if (paymentType.isNotEmpty) {
-      if (paymentType.toLowerCase() == "qris") return "QRIS";
-      if (paymentType.toLowerCase() == "bank_transfer") {
+      final type = paymentType.toLowerCase();
+
+      if (type == "qris") return "QRIS";
+      if (type == "bank_transfer") {
         return channel.isNotEmpty ? "Transfer Bank - $channel" : "Transfer Bank";
       }
-      if (paymentType.toLowerCase() == "echannel") return "Mandiri Bill";
-      if (paymentType.toLowerCase() == "gopay") return "GoPay";
-      if (paymentType.toLowerCase() == "shopeepay") return "ShopeePay";
+      if (type == "echannel") return "Mandiri Bill";
+      if (type == "gopay") return "GoPay";
+      if (type == "shopeepay") return "ShopeePay";
+
       return paymentType;
     }
 
@@ -93,15 +102,16 @@ class _HistoryPembayaranPageState extends State<HistoryPembayaranPage> {
       case "sukses":
       case "settlement":
       case "paid":
-        return Colors.green;
+      case "berhasil":
+        return KColors.gold;
       case "pending":
         return Colors.orange;
       case "gagal":
       case "expire":
       case "cancel":
-        return Colors.red;
+        return KColors.danger;
       default:
-        return Colors.grey;
+        return KColors.softText;
     }
   }
 
@@ -109,66 +119,149 @@ class _HistoryPembayaranPageState extends State<HistoryPembayaranPage> {
     final imageUrl = ApiConfig.fileUrl(coverPath);
 
     if (imageUrl.isEmpty) {
-      return const CircleAvatar(
-        radius: 28,
-        child: Icon(Icons.book),
-      );
+      return coverPlaceholder();
     }
 
-    return CircleAvatar(
-      radius: 28,
-      backgroundImage: NetworkImage(imageUrl),
-      onBackgroundImageError: (_, __) {},
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Image.network(
+        imageUrl,
+        width: 82,
+        height: 118,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => coverPlaceholder(),
+      ),
     );
   }
 
-  Widget buildHistoryCard(Map<String, dynamic> d) {
-    final status = (d["status"] ?? "-").toString();
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+  Widget coverPlaceholder() {
+    return Container(
+      width: 82,
+      height: 118,
+      decoration: BoxDecoration(
+        color: KColors.card2,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: KColors.gold.withOpacity(0.45)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: ListTile(
-          leading: buildCover(d["cover_buku"]?.toString()),
-          title: Text(
-            d["nama_lengkap"] ?? "-",
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-            ),
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 6),
+      child: const Icon(
+        Icons.receipt_long_rounded,
+        color: KColors.gold,
+        size: 38,
+      ),
+    );
+  }
+
+  Widget statusBadge(String status) {
+    final color = statusColor(status);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.16),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: Text(
+        status.isEmpty ? "Berhasil" : status,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget buildItem(Map<String, dynamic> d) {
+    final status = (d["status_pembayaran"] ??
+            d["payment_status"] ??
+            d["status"] ??
+            "Berhasil")
+        .toString();
+
+    final total =
+        d["jumlah"] ?? d["total_denda"] ?? d["total"] ?? d["denda"] ?? 0;
+    final tanggalBayar =
+        (d["tanggal_bayar"] ?? d["tanggal"] ?? d["created_at"])?.toString();
+
+    return KCard(
+      borderGold: true,
+      radius: 28,
+      margin: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          buildCover(d["cover_buku"]?.toString()),
+          const SizedBox(width: 14),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Buku: ${d["judul"] ?? "-"}"),
-                Text("Jumlah: ${formatRupiah(d["jumlah"])}"),
-                Text("Metode Pembayaran: ${formatMetode(d)}"),
-                Text("Tanggal: ${formatDate(d["tanggal"]?.toString())}"),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor(status).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
+                Text(
+                  d["judul"] ?? "-",
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                    height: 1.25,
                   ),
-                  child: Text(
-                    "Status: $status",
-                    style: TextStyle(
-                      color: statusColor(status),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
+                ),
+                const SizedBox(height: 8),
+                statusBadge(status),
+                const SizedBox(height: 10),
+                Text(
+                  "Peminjam: ${d["nama_lengkap"] ?? "-"}",
+                  style: const TextStyle(
+                    color: KColors.softText,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "Metode: ${formatMetode(d)}",
+                  style: const TextStyle(
+                    color: KColors.gold,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "Tanggal: ${formatDate(tanggalBayar)}",
+                  style: const TextStyle(
+                    color: KColors.softText,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  "Total: ${formatRupiah(total)}",
+                  style: const TextStyle(
+                    color: KColors.danger,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
                   ),
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget emptyState() {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(28),
+        child: Text(
+          "Belum ada history pembayaran denda",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: KColors.softText,
+            fontSize: 15,
           ),
         ),
       ),
@@ -178,26 +271,39 @@ class _HistoryPembayaranPageState extends State<HistoryPembayaranPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xfff8f3f7),
-      appBar: AppBar(
-        title: const Text("History Pembayaran Denda"),
-        centerTitle: true,
+      backgroundColor: KColors.bg,
+      body: Column(
+        children: [
+          KHeader(
+            title: "History Pembayaran",
+            subtitle: "Riwayat pembayaran denda buku",
+            trailing: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+            ),
+          ),
+          Expanded(
+            child: loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: KColors.gold),
+                  )
+                : data.isEmpty
+                    ? emptyState()
+                    : RefreshIndicator(
+                        onRefresh: loadData,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.only(top: 12, bottom: 24),
+                          itemCount: data.length,
+                          itemBuilder: (context, index) {
+                            return buildItem(
+                              Map<String, dynamic>.from(data[index]),
+                            );
+                          },
+                        ),
+                      ),
+          ),
+        ],
       ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : data.isEmpty
-              ? const Center(child: Text("Belum ada history pembayaran denda"))
-              : RefreshIndicator(
-                  onRefresh: loadData,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.only(top: 8, bottom: 16),
-                    itemCount: data.length,
-                    itemBuilder: (context, i) {
-                      final d = Map<String, dynamic>.from(data[i]);
-                      return buildHistoryCard(d);
-                    },
-                  ),
-                ),
     );
   }
 }

@@ -1,8 +1,10 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../config/api_config.dart';
+import '../../widgets/kejaksaan_ui.dart';
 import 'booking_detail_page.dart';
 import 'scan_return_page.dart';
 
@@ -32,10 +34,22 @@ class _SelectMemberPageState extends State<SelectMemberPage> {
     loadMembers();
   }
 
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
   String get pageTitle {
     return widget.type == "borrow"
         ? "Pilih Anggota Booking"
         : "Pilih Peminjam Aktif";
+  }
+
+  String get pageSubtitle {
+    return widget.type == "borrow"
+        ? "Pilih anggota untuk proses scan peminjaman"
+        : "Pilih anggota untuk proses pengembalian";
   }
 
   String get emptyText {
@@ -84,6 +98,7 @@ class _SelectMemberPageState extends State<SelectMemberPage> {
       final nama = (m['nama_lengkap'] ?? "").toString().toLowerCase();
       final judul = (m['judul'] ?? "").toString().toLowerCase();
       final barcode = (m['barcode'] ?? "").toString().toLowerCase();
+
       return nama.contains(keyword) ||
           judul.contains(keyword) ||
           barcode.contains(keyword);
@@ -101,7 +116,7 @@ class _SelectMemberPageState extends State<SelectMemberPage> {
             userId: member["user_id"],
           ),
         ),
-      );
+      ).then((_) => loadMembers());
       return;
     }
 
@@ -123,90 +138,183 @@ class _SelectMemberPageState extends State<SelectMemberPage> {
     final imageUrl = ApiConfig.fileUrl(coverPath);
 
     if (imageUrl.isEmpty) {
-      return CircleAvatar(
-        radius: 26,
-        backgroundColor: Colors.green.shade100,
-        child: const Icon(Icons.book),
-      );
+      return coverPlaceholder();
     }
 
-    return CircleAvatar(
-      radius: 26,
-      backgroundColor: Colors.green.shade100,
-      backgroundImage: NetworkImage(imageUrl),
-      onBackgroundImageError: (_, __) {},
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Image.network(
+        imageUrl,
+        width: 76,
+        height: 106,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => coverPlaceholder(),
+      ),
+    );
+  }
+
+  Widget coverPlaceholder() {
+    return Container(
+      width: 76,
+      height: 106,
+      decoration: BoxDecoration(
+        color: KColors.card2,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: KColors.gold.withOpacity(0.45)),
+      ),
+      child: const Icon(
+        Icons.menu_book_rounded,
+        color: KColors.gold,
+        size: 38,
+      ),
+    );
+  }
+
+  Widget buildSearch() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 6),
+      child: KCard(
+        borderGold: true,
+        radius: 22,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        child: TextField(
+          controller: searchController,
+          onChanged: searchMember,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            border: InputBorder.none,
+            hintText: "Cari nama, judul, atau barcode...",
+            hintStyle: TextStyle(color: KColors.softText),
+            prefixIcon: Icon(Icons.search_rounded, color: KColors.gold),
+          ),
+        ),
+      ),
     );
   }
 
   Widget buildMemberCard(Map member) {
     final status = (member["status"] ?? "-").toString();
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: ListTile(
-        leading: buildCover(member["cover_buku"]?.toString()),
-        title: Text(member["nama_lengkap"] ?? "-"),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Buku: ${member["judul"] ?? "-"}"),
-            Text("ID Buku / Barcode: ${member["barcode"] ?? "-"}"),
-            if (widget.type != "borrow") Text("Status: $status"),
-          ],
+    return KCard(
+      borderGold: true,
+      radius: 26,
+      margin: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      onTap: () => pilihMember(member),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          buildCover(member["cover_buku"]?.toString()),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  member["nama_lengkap"] ?? "-",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  member["judul"] ?? "-",
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: KColors.softText,
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Barcode: ${member["barcode"] ?? "-"}",
+                  style: const TextStyle(
+                    color: KColors.gold,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+                if (widget.type != "borrow") ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    "Status: $status",
+                    style: const TextStyle(
+                      color: KColors.softText,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: KColors.gold,
+            size: 30,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget emptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Text(
+          emptyText,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: KColors.softText,
+            fontSize: 15,
+          ),
         ),
-        trailing: const Icon(Icons.arrow_forward_ios),
-        onTap: () => pilihMember(member),
       ),
     );
   }
 
   @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(pageTitle),
-        centerTitle: true,
-      ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : filteredMembers.isEmpty
-              ? Center(child: Text(emptyText))
-              : Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: TextField(
-                        controller: searchController,
-                        onChanged: searchMember,
-                        decoration: InputDecoration(
-                          hintText: "Cari nama / judul / barcode...",
-                          prefixIcon: const Icon(Icons.search),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: RefreshIndicator(
+      backgroundColor: KColors.bg,
+      body: Column(
+        children: [
+          KHeader(
+            title: pageTitle,
+            subtitle: pageSubtitle,
+            trailing: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+            ),
+          ),
+          buildSearch(),
+          Expanded(
+            child: loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: KColors.gold),
+                  )
+                : filteredMembers.isEmpty
+                    ? emptyState()
+                    : RefreshIndicator(
                         onRefresh: loadMembers,
                         child: ListView.builder(
+                          padding: const EdgeInsets.only(bottom: 24),
                           itemCount: filteredMembers.length,
                           itemBuilder: (context, index) {
-                            final member = filteredMembers[index];
-                            return buildMemberCard(member);
+                            return buildMemberCard(
+                              Map<String, dynamic>.from(filteredMembers[index]),
+                            );
                           },
                         ),
                       ),
-                    ),
-                  ],
-                ),
+          ),
+        ],
+      ),
     );
   }
 }

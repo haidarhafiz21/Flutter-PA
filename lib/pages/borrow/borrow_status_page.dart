@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../config/api_config.dart';
+import '../../widgets/kejaksaan_ui.dart';
 import '../payment_webview_page.dart';
 
 class BorrowStatusPage extends StatefulWidget {
@@ -28,7 +30,6 @@ class _BorrowStatusPageState extends State<BorrowStatusPage> {
 
     timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-
       refreshTick++;
 
       if (refreshTick % 15 == 0) {
@@ -47,24 +48,15 @@ class _BorrowStatusPageState extends State<BorrowStatusPage> {
 
   String rupiah(dynamic value) {
     final number = int.tryParse(value.toString()) ?? 0;
-    final str = number.toString();
-    final buffer = StringBuffer();
-    int counter = 0;
-
-    for (int i = str.length - 1; i >= 0; i--) {
-      counter++;
-      buffer.write(str[i]);
-      if (counter == 3 && i != 0) {
-        buffer.write('.');
-        counter = 0;
-      }
-    }
-
-    return "Rp ${buffer.toString().split('').reversed.join()}";
+    return "Rp ${number.toString().replaceAllMapped(
+          RegExp(r'\B(?=(\d{3})+(?!\d))'),
+          (match) => '.',
+        )}";
   }
 
   String formatDateOnly(String? date) {
     if (date == null || date.isEmpty) return "-";
+
     try {
       final dt = DateTime.parse(date).toLocal();
       const bulan = [
@@ -120,6 +112,7 @@ class _BorrowStatusPageState extends State<BorrowStatusPage> {
       final diff = deadline.difference(now);
       final menit = diff.inMinutes.remainder(60).toString().padLeft(2, '0');
       final detik = diff.inSeconds.remainder(60).toString().padLeft(2, '0');
+
       return "$menit:$detik";
     } catch (e) {
       return "-";
@@ -159,13 +152,28 @@ class _BorrowStatusPageState extends State<BorrowStatusPage> {
       case "booking":
         return Colors.orange;
       case "dipinjam":
-        return Colors.green;
+        return KColors.gold;
       case "terlambat":
-        return Colors.red;
+        return KColors.danger;
       case "menunggu_pembayaran":
-        return Colors.deepOrange;
+        return Colors.deepOrangeAccent;
       default:
         return Colors.grey;
+    }
+  }
+
+  String statusText(String status) {
+    switch (status) {
+      case "booking":
+        return "Menunggu Diambil";
+      case "dipinjam":
+        return "Sedang Dipinjam";
+      case "terlambat":
+        return "Terlambat";
+      case "menunggu_pembayaran":
+        return "Menunggu Pembayaran";
+      default:
+        return status;
     }
   }
 
@@ -176,6 +184,75 @@ class _BorrowStatusPageState extends State<BorrowStatusPage> {
       );
       await loadData(showLoading: false);
     } catch (_) {}
+  }
+
+  Widget buildCover(String? coverPath) {
+    final imageUrl = ApiConfig.fileUrl(coverPath);
+
+    if (imageUrl.isEmpty) return coverPlaceholder();
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Image.network(
+        imageUrl,
+        width: 92,
+        height: 128,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => coverPlaceholder(),
+      ),
+    );
+  }
+
+  Widget coverPlaceholder() {
+    return Container(
+      width: 92,
+      height: 128,
+      decoration: BoxDecoration(
+        color: KColors.card2,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: KColors.gold.withOpacity(0.5)),
+      ),
+      child: const Icon(
+        Icons.menu_book_rounded,
+        color: KColors.gold,
+        size: 46,
+      ),
+    );
+  }
+
+  Widget statusBadge(String status) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: statusColor(status).withOpacity(0.18),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: statusColor(status).withOpacity(0.35)),
+      ),
+      child: Text(
+        statusText(status),
+        style: TextStyle(
+          color: statusColor(status),
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget dendaText(String label, int value) {
+    if (value <= 0) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Text(
+        "$label : ${rupiah(value)}",
+        style: const TextStyle(
+          color: KColors.danger,
+          fontWeight: FontWeight.w800,
+          fontSize: 13,
+        ),
+      ),
+    );
   }
 
   Widget buildItem(Map item) {
@@ -192,146 +269,114 @@ class _BorrowStatusPageState extends State<BorrowStatusPage> {
         int.tryParse((item["total_denda"] ?? item["denda"] ?? 0).toString()) ??
             0;
 
-    final imageUrl = ApiConfig.fileUrl(item["cover_buku"]?.toString());
-
     final paymentUrl = (item["payment_url"] ?? "").toString().trim();
+
     final canPayOnline =
         (status == "terlambat" || status == "menunggu_pembayaran") &&
             paymentUrl.isNotEmpty &&
             !statusBayar;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    return KCard(
+      margin: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 10,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
+      radius: 26,
+      borderGold: true,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: imageUrl.isNotEmpty
-                ? Image.network(
-                    imageUrl,
-                    width: 82,
-                    height: 108,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 82,
-                      height: 108,
-                      color: Colors.orange,
-                      child: const Icon(Icons.book, color: Colors.white),
-                    ),
-                  )
-                : Container(
-                    width: 82,
-                    height: 108,
-                    color: Colors.orange,
-                    child: const Icon(Icons.book, color: Colors.white),
-                  ),
-          ),
-          const SizedBox(width: 16),
+          buildCover(item["cover_buku"]?.toString()),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   item["judul"] ?? "-",
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  status,
-                  style: TextStyle(
-                    color: statusColor(status),
-                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                     fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    height: 1.25,
                   ),
                 ),
+                const SizedBox(height: 8),
+                statusBadge(status),
                 const SizedBox(height: 10),
                 Text(
                   "Pinjam : ${formatDateOnly(item["tanggal_pinjam"]?.toString())}",
+                  style: KText.body.copyWith(fontSize: 13),
                 ),
                 Text(
-                  "Pengembalian : ${formatDateOnly(item["tanggal_kembali"]?.toString())}",
+                  "Kembali : ${formatDateOnly(item["tanggal_kembali"]?.toString())}",
+                  style: KText.body.copyWith(fontSize: 13),
                 ),
-                if (status == "booking") ...[
+                const SizedBox(height: 4),
+                if (status == "booking")
                   Text(
-                    "Sisa waktu: ${hitungSisaWaktu(item["batas_ambil"]?.toString())}",
+                    "Sisa waktu ambil : ${hitungSisaWaktu(item["batas_ambil"]?.toString())}",
                     style: const TextStyle(
-                      color: Colors.orange,
-                      fontWeight: FontWeight.bold,
+                      color: KColors.gold,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
                     ),
-                  ),
-                ] else ...[
+                  )
+                else
                   Text(
                     "Terlambat : ${hitungTerlambatHari(item["tanggal_kembali"]?.toString(), statusBayar)}",
-                  ),
-                ],
-                if (status == "menunggu_pembayaran") ...[
-                  const SizedBox(height: 4),
-                  const Text(
-                    "Buku sudah dikembalikan, tinggal selesaikan pembayaran denda.",
                     style: TextStyle(
-                      color: Colors.deepOrange,
-                      fontWeight: FontWeight.w600,
+                      color: status == "terlambat"
+                          ? KColors.danger
+                          : KColors.softText,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                if (status == "menunggu_pembayaran") ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.deepOrange.withOpacity(0.16),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.deepOrange.withOpacity(0.35),
+                      ),
+                    ),
+                    child: const Text(
+                      "Buku sudah dikembalikan, selesaikan pembayaran denda terlebih dahulu.",
+                      style: TextStyle(
+                        color: Colors.deepOrangeAccent,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
                     ),
                   ),
                 ],
-                if (dendaTerlambat > 0) ...[
+                dendaText("Denda Terlambat", dendaTerlambat),
+                dendaText("Denda Kerusakan", dendaKerusakan),
+                dendaText("Denda Kehilangan", dendaKehilangan),
+                if (totalDenda > 0) ...[
                   const SizedBox(height: 6),
                   Text(
-                    "Denda Terlambat : ${rupiah(dendaTerlambat)}",
-                    style: const TextStyle(color: Colors.red),
+                    "Total Denda : ${rupiah(totalDenda)}",
+                    style: const TextStyle(
+                      color: KColors.danger,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                    ),
                   ),
                 ],
-                if (dendaKerusakan > 0) ...[
-                  Text(
-                    "Denda Kerusakan : ${rupiah(dendaKerusakan)}",
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                ],
-                if (dendaKehilangan > 0) ...[
-                  Text(
-                    "Denda Kehilangan : ${rupiah(dendaKehilangan)}",
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                ],
-                const SizedBox(height: 4),
-                Text(
-                  "Total Denda : ${rupiah(totalDenda)}",
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
                 if (canPayOnline) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
-                    height: 46,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      onPressed: () async {
+                    child: KButton(
+                      text: "Bayar Online",
+                      icon: Icons.payments_rounded,
+                      onTap: () async {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -339,10 +384,6 @@ class _BorrowStatusPageState extends State<BorrowStatusPage> {
                           ),
                         ).then((_) => syncStatus(item["id"] ?? 0));
                       },
-                      child: const Text(
-                        "Bayar Online",
-                        style: TextStyle(color: Colors.white),
-                      ),
                     ),
                   ),
                 ] else if ((status == "terlambat" ||
@@ -350,11 +391,11 @@ class _BorrowStatusPageState extends State<BorrowStatusPage> {
                     !statusBayar) ...[
                   const SizedBox(height: 10),
                   const Text(
-                    "Menunggu admin membuat tagihan online atau konfirmasi pembayaran.",
+                    "Menunggu admin membuat tagihan atau konfirmasi pembayaran.",
                     style: TextStyle(
-                      color: Colors.black54,
-                      fontSize: 13,
-                      height: 1.4,
+                      color: KColors.softText,
+                      fontSize: 12.5,
+                      height: 1.35,
                     ),
                   ),
                 ],
@@ -366,28 +407,67 @@ class _BorrowStatusPageState extends State<BorrowStatusPage> {
     );
   }
 
+  Widget emptyState() {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(34),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.assignment_turned_in_rounded,
+              color: KColors.gold,
+              size: 88,
+            ),
+            SizedBox(height: 16),
+            Text(
+              "Belum Ada Peminjaman",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+              ),
+            ),
+            SizedBox(height: 6),
+            Text(
+              "Buku yang sedang dipinjam akan muncul di halaman ini.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: KColors.softText),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xfff5f2f5),
-      appBar: AppBar(
-        title: const Text("Status Peminjaman"),
-        centerTitle: true,
+      backgroundColor: KColors.bg,
+      body: Column(
+        children: [
+          const KHeader(
+            title: "Status Peminjaman",
+            subtitle: "Pantau buku yang sedang dipinjam",
+          ),
+          Expanded(
+            child: loading
+                ? const Center(child: CircularProgressIndicator())
+                : data.isEmpty
+                    ? emptyState()
+                    : RefreshIndicator(
+                        onRefresh: loadData,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.only(top: 12, bottom: 24),
+                          itemCount: data.length,
+                          itemBuilder: (context, index) {
+                            return buildItem(data[index]);
+                          },
+                        ),
+                      ),
+          ),
+        ],
       ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : data.isEmpty
-              ? const Center(child: Text("Tidak ada peminjaman"))
-              : RefreshIndicator(
-                  onRefresh: loadData,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.only(top: 12, bottom: 18),
-                    itemCount: data.length,
-                    itemBuilder: (context, index) {
-                      return buildItem(data[index]);
-                    },
-                  ),
-                ),
     );
   }
 }
